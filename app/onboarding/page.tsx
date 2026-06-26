@@ -30,15 +30,24 @@ export default function OnboardingPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const { error } = await supabase.from('profiles').update({
+      const { error: updateError } = await supabase.from('profiles').update({
         role: selectedRole,
         onboarded: true,
         updated_at: new Date().toISOString(),
       }).eq('id', user.id);
 
-      if (error) {
-        toast('Failed to save your role. Please try again.', 'error');
-        return;
+      if (updateError) {
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          email: user.email,
+          role: selectedRole,
+          onboarded: true,
+          updated_at: new Date().toISOString(),
+        });
+        if (upsertError) {
+          toast('Failed to save your role. Please try again.', 'error');
+          return;
+        }
       }
 
       router.push('/dashboard');

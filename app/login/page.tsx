@@ -78,7 +78,31 @@ function LoginForm() {
       },
     });
     if (error) {
-      toast('Failed to connect to Google. Please try again.', 'error');
+      if (error.message.includes('not enabled') || error.message.includes('Unsupported provider')) {
+        toast('Google sign-in is not available yet. Please use email and password.', 'error');
+      } else {
+        toast('Failed to connect to Google. Please try again.', 'error');
+      }
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast('Enter your email first, then click "Forgot password".', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      });
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        toast('Password reset link sent. Check your email.', 'success');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,6 +148,15 @@ function LoginForm() {
           {loading ? 'Loading...' : isLogin ? 'Log in' : 'Sign up'}
         </Button>
       </form>
+
+      {isLogin && (
+        <button
+          onClick={handleForgotPassword}
+          className="block w-full text-center text-[12px] text-[#185FA5] hover:underline mt-3"
+        >
+          Forgot password?
+        </button>
+      )}
 
       <p className="text-[12px] text-[#5F5E5A] text-center mt-4">
         {isLogin ? "Don't have an account? " : 'Already have an account? '}

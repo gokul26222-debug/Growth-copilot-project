@@ -1,12 +1,13 @@
 'use client';
 
+import { useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
 export function Navbar({ email }: { email?: string }) {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();

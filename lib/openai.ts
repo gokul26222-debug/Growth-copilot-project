@@ -31,7 +31,13 @@ function safeJsonParse(text: string): unknown {
     return JSON.parse(text);
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        throw new Error('Invalid JSON response from AI');
+      }
+    }
     throw new Error('Invalid JSON response from AI');
   }
 }
@@ -39,28 +45,21 @@ function safeJsonParse(text: string): unknown {
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<unknown> {
   if (!process.env.OPENAI_API_KEY) throw new Error('No OpenAI key');
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const response = await getOpenAIClient().chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
 
-  try {
-    const response = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 2000,
-    }, { signal: controller.signal });
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error('Empty AI response');
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error('Empty AI response');
-
-    return safeJsonParse(content);
-  } finally {
-    clearTimeout(timeout);
-  }
+  return safeJsonParse(content);
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<unknown> {
@@ -78,19 +77,21 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<unk
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
-            parts: [{ text: `${systemPrompt}\n\n${userPrompt}\n\nRespond ONLY with valid JSON.` }],
+            parts: [{ text: `${systemPrompt}\n\n${userPrompt}\n\nRespond ONLY with valid JSON, no markdown.` }],
           }],
           generationConfig: {
             temperature: 0.3,
             maxOutputTokens: 2000,
-            responseMimeType: 'application/json',
           },
         }),
         signal: controller.signal,
       }
     );
 
-    if (!response.ok) throw new Error(`Gemini error: ${response.status}`);
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`Gemini error ${response.status}: ${errorBody.slice(0, 200)}`);
+    }
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
