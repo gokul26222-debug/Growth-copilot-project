@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Analysis } from '@/lib/types';
@@ -20,20 +20,22 @@ export default function AnalysisPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setEmail(user.email || '');
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('analyses')
         .select('*')
         .eq('id', id)
         .single();
 
-      setAnalysis(data as Analysis | null);
+      if (!error && data) {
+        setAnalysis(data as Analysis);
+      }
       setLoading(false);
     }
     load();

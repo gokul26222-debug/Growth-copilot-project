@@ -30,7 +30,7 @@ export function DownloadButton({ analysisId }: DownloadButtonProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `growth-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `growth-report-${new Date().toISOString().slice(0, 10)}.html`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Analysis } from '@/lib/types';
 import { Navbar } from '@/components/layout/navbar';
@@ -25,18 +25,20 @@ export default function DashboardPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const { step, progress, error, analysis: newAnalysis, upload, reset } = useUpload();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setEmail(user.email || '');
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('analyses')
       .select('*')
       .order('created_at', { ascending: false });
 
-    setAnalyses((data as Analysis[]) || []);
+    if (!error) {
+      setAnalyses((data as Analysis[]) || []);
+    }
     setLoadingData(false);
   }, [supabase]);
 

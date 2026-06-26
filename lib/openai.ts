@@ -13,15 +13,27 @@ export async function generateAIResponse<T>(
     () => callGemini(systemPrompt, userPrompt),
   ];
 
+  let lastError: Error | null = null;
   for (const provider of providers) {
     try {
       return await provider() as T;
-    } catch {
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
       continue;
     }
   }
 
-  throw new Error('AI service unavailable. All providers failed.');
+  throw lastError || new Error('AI service unavailable. All providers failed.');
+}
+
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('Invalid JSON response from AI');
+  }
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<unknown> {
@@ -45,7 +57,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<unk
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error('Empty AI response');
 
-    return JSON.parse(content);
+    return safeJsonParse(content);
   } finally {
     clearTimeout(timeout);
   }
@@ -84,7 +96,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<unk
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error('Empty Gemini response');
 
-    return JSON.parse(text);
+    return safeJsonParse(text);
   } finally {
     clearTimeout(timeout);
   }

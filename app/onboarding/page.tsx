@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
 const roles = [
@@ -17,23 +18,35 @@ const roles = [
 export default function OnboardingPage() {
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleSubmit = async () => {
     if (!selectedRole) return;
     setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/login'); return; }
 
-    await supabase.from('profiles').update({
-      role: selectedRole,
-      onboarded: true,
-      updated_at: new Date().toISOString(),
-    }).eq('id', user.id);
+      const { error } = await supabase.from('profiles').update({
+        role: selectedRole,
+        onboarded: true,
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id);
 
-    router.push('/dashboard');
+      if (error) {
+        toast('Failed to save your role. Please try again.', 'error');
+        return;
+      }
+
+      router.push('/dashboard');
+    } catch {
+      toast('Something went wrong. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

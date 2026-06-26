@@ -28,11 +28,13 @@ export async function POST(request: NextRequest) {
     const metrics = calculateMetrics(data);
     const growthScore = calculateGrowthScore(metrics);
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
+
+    const role = (!profileError && profile?.role) ? profile.role : 'other';
 
     return NextResponse.json({
       metrics,
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
       parsedData: data,
       fileName: file.name,
       rowCount: data.length,
-      role: profile?.role || 'other',
+      role,
     });
   } catch {
     return NextResponse.json({ error: 'Failed to analyze file' }, { status: 500 });
@@ -55,17 +57,21 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    if (!body.fileName || !body.metrics || !body.problems || !body.experiments) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from('analyses')
       .insert({
         user_id: user.id,
-        file_name: body.fileName,
-        row_count: body.rowCount,
-        growth_score: body.growthScore,
+        file_name: String(body.fileName).slice(0, 255),
+        row_count: Number(body.rowCount) || 0,
+        growth_score: Number(body.growthScore) || 0,
         metrics: body.metrics,
         problems: body.problems,
         experiments: body.experiments,
-        raw_data: body.parsedData.slice(-500),
+        raw_data: Array.isArray(body.parsedData) ? body.parsedData.slice(-500) : [],
         status: 'completed',
       })
       .select()

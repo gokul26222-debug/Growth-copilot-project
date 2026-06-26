@@ -4,6 +4,15 @@ import { Analysis } from '@/lib/types';
 import { getScoreColor, formatPercent } from '@/lib/utils';
 import { BENCHMARKS } from '@/lib/constants';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -12,13 +21,17 @@ export async function POST(request: NextRequest) {
 
     const { analysisId } = await request.json();
 
-    const { data } = await supabase
+    if (!analysisId || typeof analysisId !== 'string') {
+      return NextResponse.json({ error: 'Invalid analysis ID' }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
       .from('analyses')
       .select('*')
       .eq('id', analysisId)
       .single();
 
-    if (!data) return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
+    if (error || !data) return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
 
     const analysis = data as Analysis;
     const scoreInfo = getScoreColor(analysis.growth_score);
@@ -68,32 +81,32 @@ th { color: #5F5E5A; font-weight: 400; }
 </head>
 <body>
 <h1>Growth Report</h1>
-<p class="label">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+<p class="label">Generated ${escapeHtml(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</p>
 
 <div style="text-align: center; margin: 40px 0;">
-  <div class="score">${analysis.growth_score}/100</div>
-  <div class="label">${scoreLabel}</div>
+  <div class="score">${Number(analysis.growth_score)}/100</div>
+  <div class="label">${escapeHtml(scoreLabel)}</div>
 </div>
 
 <h2>Metrics summary</h2>
 <table>
 <tr><th>Metric</th><th>Current</th><th>Benchmark</th></tr>
-${metricsRows.map(([m, v, b]) => `<tr><td>${m}</td><td>${v}</td><td>${b}</td></tr>`).join('\n')}
+${metricsRows.map(([m, v, b]) => `<tr><td>${escapeHtml(String(m))}</td><td>${escapeHtml(String(v))}</td><td>${escapeHtml(String(b))}</td></tr>`).join('\n')}
 </table>
 
 <h2>Biggest problems</h2>
-${analysis.problems.map((p, i) => `
+${(analysis.problems || []).map((p, i) => `
 <div class="card">
-  <strong>${i + 1}. ${p.title}</strong> <span class="severity-${p.severity}">(${p.severity})</span>
-  <p style="margin: 4px 0 0; font-size: 13px; color: #5F5E5A;">${p.description}</p>
+  <strong>${i + 1}. ${escapeHtml(p.title)}</strong> <span class="severity-${escapeHtml(p.severity)}">(${escapeHtml(p.severity)})</span>
+  <p style="margin: 4px 0 0; font-size: 13px; color: #5F5E5A;">${escapeHtml(p.description)}</p>
 </div>`).join('\n')}
 
 <h2>Recommended experiments</h2>
-${analysis.experiments.map((e, i) => `
+${(analysis.experiments || []).map((e, i) => `
 <div class="card">
-  <strong>${i + 1}. ${e.title}</strong> <span class="label">${e.priority} · ${e.expected_impact} impact · ${e.difficulty}</span>
-  <p style="margin: 4px 0 0; font-size: 13px; color: #5F5E5A;">${e.hypothesis}</p>
-  <p style="margin: 4px 0 0; font-size: 12px; color: #5F5E5A;">Owner: ${e.owner} · Timeline: ${e.timeline} · Track: ${e.metric_to_track}</p>
+  <strong>${i + 1}. ${escapeHtml(e.title)}</strong> <span class="label">${escapeHtml(e.priority)} · ${escapeHtml(e.expected_impact)} impact · ${escapeHtml(e.difficulty)}</span>
+  <p style="margin: 4px 0 0; font-size: 13px; color: #5F5E5A;">${escapeHtml(e.hypothesis)}</p>
+  <p style="margin: 4px 0 0; font-size: 12px; color: #5F5E5A;">Owner: ${escapeHtml(e.owner)} · Timeline: ${escapeHtml(e.timeline)} · Track: ${escapeHtml(e.metric_to_track)}</p>
 </div>`).join('\n')}
 
 <h2>Next steps</h2>
