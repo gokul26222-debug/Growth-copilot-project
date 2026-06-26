@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
 import { Analysis } from '@/lib/types';
 import { getScoreColor, formatPercent } from '@/lib/utils';
 import { BENCHMARKS } from '@/lib/constants';
@@ -15,27 +14,13 @@ function escapeHtml(str: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const analysis = await request.json() as Analysis;
 
-    const { analysisId } = await request.json();
-
-    if (!analysisId || typeof analysisId !== 'string') {
-      return NextResponse.json({ error: 'Invalid analysis ID' }, { status: 400 });
+    if (!analysis.metrics || !analysis.problems || !analysis.experiments) {
+      return NextResponse.json({ error: 'Invalid analysis data' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('analyses')
-      .select('*')
-      .eq('id', analysisId)
-      .single();
-
-    if (error || !data) return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
-
-    const analysis = data as Analysis;
     const scoreInfo = getScoreColor(analysis.growth_score);
-
     const html = generateReportHTML(analysis, scoreInfo.label);
 
     return new NextResponse(html, {

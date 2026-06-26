@@ -8,8 +8,8 @@ export default function LandingPage() {
       <nav className="border-b border-[#D3D1C7]">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <span className="text-[14px] font-medium text-[#2C2C2A]">Growth copilot</span>
-          <Link href="/login">
-            <Button variant="secondary" size="sm">Log in</Button>
+          <Link href="/dashboard">
+            <Button variant="secondary" size="sm">Go to dashboard</Button>
           </Link>
         </div>
       </nav>
@@ -25,7 +25,7 @@ export default function LandingPage() {
           Upload your metrics. AI finds the problems. You get experiments to run.
         </p>
 
-        <Link href="/login">
+        <Link href="/dashboard">
           <Button size="lg">Get started free</Button>
         </Link>
 

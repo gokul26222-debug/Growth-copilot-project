@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
 import { generateAIResponse } from '@/lib/openai';
-import { checkRateLimit, logAction } from '@/lib/rate-limiter';
 import { Metrics, Problem } from '@/lib/types';
 import { BENCHMARKS } from '@/lib/constants';
 
@@ -11,18 +9,6 @@ interface InsightsResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const rateLimit = await checkRateLimit(user.id, 'insights', 5, 3600000);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Analysis limit reached. Please wait.' },
-        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
-      );
-    }
-
     const { metrics, role } = await request.json() as { metrics: Metrics; role: string };
 
     const systemPrompt = `You are a senior growth analyst at a B2B SaaS company.
@@ -43,7 +29,6 @@ Identify the 3 biggest problems. Rank by business impact.
 Return JSON: { "problems": [{ "title": string, "description": string, "severity": "critical"|"warning"|"info", "metric": string }] }`;
 
     const result = await generateAIResponse<InsightsResponse>(systemPrompt, userPrompt);
-    await logAction(user.id, 'insights', { metrics });
 
     return NextResponse.json({ problems: result.problems || [] });
   } catch (err) {

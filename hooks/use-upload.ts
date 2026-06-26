@@ -65,27 +65,22 @@ export function useUpload() {
       }
       const expData = await expRes.json();
 
-      setStep('saving');
-      setProgress(90);
-
-      const saveRes = await fetch('/api/analyze', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...analyzeData,
-          problems: insightsData.problems,
-          experiments: expData.experiments,
-        }),
-      });
-      if (!saveRes.ok) {
-        const err = await saveRes.json();
-        throw new Error(err.error || 'Failed to save analysis');
-      }
-      const savedAnalysis = await saveRes.json();
-
-      setAnalysis(savedAnalysis);
-      setStep('completed');
       setProgress(100);
+
+      setAnalysis({
+        id: crypto.randomUUID(),
+        user_id: '',
+        file_name: analyzeData.fileName,
+        row_count: analyzeData.rowCount,
+        growth_score: analyzeData.growthScore,
+        metrics: analyzeData.metrics,
+        problems: insightsData.problems,
+        experiments: expData.experiments,
+        raw_data: analyzeData.parsedData,
+        status: 'completed',
+        created_at: new Date().toISOString(),
+      });
+      setStep('completed');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong';
       setError(message);
@@ -97,7 +92,6 @@ export function useUpload() {
     setStep('idle');
     setProgress(0);
     setError(null);
-    setAnalysis(null);
   }, []);
 
   return { step, progress, error, analysis, upload, reset };

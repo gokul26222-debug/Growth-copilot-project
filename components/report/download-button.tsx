@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { Analysis } from '@/lib/types';
 
 interface DownloadButtonProps {
-  analysisId: string;
+  analysis: Analysis;
 }
 
-export function DownloadButton({ analysisId }: DownloadButtonProps) {
+export function DownloadButton({ analysis }: DownloadButtonProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -18,7 +19,7 @@ export function DownloadButton({ analysisId }: DownloadButtonProps) {
       const res = await fetch('/api/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisId }),
+        body: JSON.stringify(analysis),
       });
 
       if (!res.ok) {
