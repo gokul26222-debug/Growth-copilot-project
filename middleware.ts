@@ -1,15 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (pathname === '/login' || pathname === '/onboarding') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
+export function middleware() {
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ['/login', '/onboarding'],
-};
