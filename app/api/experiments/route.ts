@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAIResponse } from '@/lib/openai';
+import { generateFallbackExperiments } from '@/lib/fallback-analysis';
 import { Metrics, Problem, Experiment } from '@/lib/types';
 
 interface ExperimentsResponse {
@@ -10,13 +11,19 @@ export async function POST(request: NextRequest) {
   try {
     const { problems, metrics } = await request.json() as { problems: Problem[]; metrics: Metrics };
 
-    const systemPrompt = `You are a senior growth PM. Given growth problems,
+    if (!problems || !Array.isArray(problems) || !metrics) {
+      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
+    }
+
+    // Try AI first, fall back to rule-based generation
+    try {
+      const systemPrompt = `You are a senior growth PM. Given growth problems,
 generate exactly 5 prioritized experiments. Each must be specific, actionable, and measurable.
-Respond ONLY with valid JSON.`;
+Respond ONLY with valid JSON, no markdown.`;
 
-    const problemsList = problems.map((p, i) => `${i + 1}. ${p.title}: ${p.description}`).join('\n');
+      const problemsList = problems.map((p, i) => `${i + 1}. ${p.title}: ${p.description}`).join('\n');
 
-    const userPrompt = `Our biggest problems:
+      const userPrompt = `Our biggest problems:
 ${problemsList}
 
 Current metrics:
@@ -30,14 +37,20 @@ Generate 5 experiments. Rank by impact-to-effort ratio.
 
 Return JSON: { "experiments": [{ "title": string, "problem": string, "hypothesis": string, "expected_impact": "high"|"medium"|"low", "difficulty": "easy"|"medium"|"hard", "priority": "P0"|"P1"|"P2", "metric_to_track": string, "owner": "PM"|"Engineering"|"Design"|"Marketing", "timeline": string }] }`;
 
-    const result = await generateAIResponse<ExperimentsResponse>(systemPrompt, userPrompt);
+      const result = await generateAIResponse<ExperimentsResponse>(systemPrompt, userPrompt);
 
-    return NextResponse.json({ experiments: result.experiments || [] });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'AI service unavailable';
-    if (message.includes('timeout') || message.includes('abort')) {
-      return NextResponse.json({ error: 'Analysis took too long. Please try again.' }, { status: 504 });
+      if (result.experiments && Array.isArray(result.experiments) && result.experiments.length > 0) {
+        return NextResponse.json({ experiments: result.experiments });
+      }
+    } catch (err) {
+      console.error('[Experiments] AI failed, using fallback:', err instanceof Error ? err.message : err);
     }
-    return NextResponse.json({ error: 'Our AI is temporarily unavailable. Try again in a minute.' }, { status: 500 });
+
+    // Fallback: rule-based experiment generation
+    const experiments = generateFallbackExperiments(problems, metrics);
+    return NextResponse.json({ experiments });
+  } catch (err) {
+    console.error('[Experiments] Unexpected error:', err);
+    return NextResponse.json({ error: 'Failed to generate experiments' }, { status: 500 });
   }
 }

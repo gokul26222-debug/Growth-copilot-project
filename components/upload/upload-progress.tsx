@@ -14,11 +14,10 @@ const steps = [
   { key: 'calculating', label: 'Metrics calculated' },
   { key: 'analyzing', label: 'Finding growth gaps' },
   { key: 'generating', label: 'Generating experiments' },
-  { key: 'saving', label: 'Building report' },
 ] as const;
 
 const stepOrder: Record<string, number> = {
-  uploading: 0, parsing: 0, calculating: 1, analyzing: 2, generating: 3, saving: 4, completed: 5,
+  uploading: 0, parsing: 0, calculating: 1, analyzing: 2, generating: 3, completed: 4,
 };
 
 export function UploadProgress({ step, progress, error }: UploadProgressProps) {

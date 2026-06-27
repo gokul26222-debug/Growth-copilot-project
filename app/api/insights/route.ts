@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAIResponse } from '@/lib/openai';
+import { generateFallbackProblems } from '@/lib/fallback-analysis';
 import { Metrics, Problem } from '@/lib/types';
 import { BENCHMARKS } from '@/lib/constants';
 
@@ -11,12 +12,18 @@ export async function POST(request: NextRequest) {
   try {
     const { metrics, role } = await request.json() as { metrics: Metrics; role: string };
 
-    const systemPrompt = `You are a senior growth analyst at a B2B SaaS company.
+    if (!metrics || typeof metrics.activation_rate !== 'number') {
+      return NextResponse.json({ error: 'Invalid metrics data' }, { status: 400 });
+    }
+
+    // Try AI first, fall back to rule-based analysis
+    try {
+      const systemPrompt = `You are a senior growth analyst at a B2B SaaS company.
 Given product metrics, identify the 3 biggest growth problems.
 Be specific. Use exact numbers. Compare to SaaS benchmarks.
-Respond ONLY with valid JSON.`;
+Respond ONLY with valid JSON, no markdown.`;
 
-    const userPrompt = `Here are our current SaaS metrics:
+      const userPrompt = `Here are our current SaaS metrics:
 - Activation Rate: ${metrics.activation_rate}% (benchmark: ${BENCHMARKS.activation_rate}%)
 - Conversion Rate: ${metrics.conversion_rate}% (benchmark: ${BENCHMARKS.conversion_rate}%)
 - Retention Rate: ${metrics.retention_rate}% (benchmark: ${BENCHMARKS.retention_rate}%)
@@ -28,14 +35,20 @@ Identify the 3 biggest problems. Rank by business impact.
 
 Return JSON: { "problems": [{ "title": string, "description": string, "severity": "critical"|"warning"|"info", "metric": string }] }`;
 
-    const result = await generateAIResponse<InsightsResponse>(systemPrompt, userPrompt);
+      const result = await generateAIResponse<InsightsResponse>(systemPrompt, userPrompt);
 
-    return NextResponse.json({ problems: result.problems || [] });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'AI service unavailable';
-    if (message.includes('timeout') || message.includes('abort')) {
-      return NextResponse.json({ error: 'Analysis took too long. Please try again.' }, { status: 504 });
+      if (result.problems && Array.isArray(result.problems) && result.problems.length > 0) {
+        return NextResponse.json({ problems: result.problems });
+      }
+    } catch (err) {
+      console.error('[Insights] AI failed, using fallback:', err instanceof Error ? err.message : err);
     }
-    return NextResponse.json({ error: 'Our AI is temporarily unavailable. Try again in a minute.' }, { status: 500 });
+
+    // Fallback: rule-based analysis
+    const problems = generateFallbackProblems(metrics);
+    return NextResponse.json({ problems });
+  } catch (err) {
+    console.error('[Insights] Unexpected error:', err);
+    return NextResponse.json({ error: 'Failed to analyze metrics' }, { status: 500 });
   }
 }
